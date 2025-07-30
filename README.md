@@ -1,70 +1,56 @@
-# Getting Started with Create React App
+# [강냉톤] 손짓 서비스
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+![메인로고.png](attachment:c2b73b2d-904c-48c7-b20b-430e09ccaf76:메인로고.png)
 
-## Available Scripts
+# ✋ 손짓 서비스 기획안
 
-In the project directory, you can run:
+Figma 디자인 계획서: https://www.figma.com/design/YCfeoVBwRcilLT5Wubera3/%EC%86%90%EC%A7%93-SignBridge-?node-id=0-1&t=DYa9aM1dBQGEZ7xP-1
 
-### `npm start`
+---
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## 📌 서비스 한 줄 요약
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+> 손짓은 수어 사용자(청각·언어장애인)의 손동작을 인식하여, 이를 한글 텍스트로 실시간 변환하는 수어-문자 번역 웹서비스입니다.
+> 
+> 
+> 이를 통해 수어 사용자의 **의사소통 권리**, **정보 전달 능력**, **사회 참여 기회**를 확대합니다.
+> 
 
-### `npm test`
+---
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## 🎯 서비스 목적
 
-### `npm run build`
+- 청각·언어장애인의 **의사 표현 수단 확보**
+- **수어-비수어 사용자 간의 소통 문제 해결**
+- 실시간 번역을 통해 **공공 정보 접근성 향상**
+- 수어 데이터를 디지털화 → **정보화된 소통 가능**
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+---
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## 🧩 해결하고자 하는 사회문제
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+| 문제 | 손짓이 해결하는 방식 |
+| --- | --- |
+| ❌ 수어 사용자 의견 전달 어려움 | ✨ 수어 → 한글 번역으로 자유로운 표현 가능 |
+| ❌ 수어 비사용자와의 의사소통 단절 | ✨ 실시간 번역으로 비장애인과 자연스러운 대화 |
+| ❌ 수어 통역사 부족 | ✨ 웹 기반 수어 번역 서비스로 누구나 접근 가능 |
+| ❌ 정보 전달의 비대칭 | ✨ 사용자도 정보 제공자(발신자)가 될 수 있음 |
 
-### `npm run eject`
+---
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## 🔗 "정보(information)"와의 연결성
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+- 수어를 → **텍스트 정보화**하여, **디지털 소통이 가능**하게 만듬
+- 청각장애인이 공공/생활 정보를 **요청하거나 제공할 수 있는 도구**
+- 수어 입력 기반으로 **정책, 서비스, 안내 정보 검색**까지 확장 가능
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+---
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## 💡 주요 기능
 
-## Learn More
+| 기능명 | 설명 |
+| --- | --- |
+| ✋ 실시간 수어 인식 | 카메라 기반 손동작 인식 → 한글 자막 출력 |
+| 📄 한글 텍스트 변환 | 인식된 수어를 문장 단위로 자연스럽게 번역 |
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+사회 전반에 걸쳐 소통 방식의 차이로 인한 접근성이 제한되고 있는 상황에서 인공지능 기술 활용의 사회문제 해결 가능성 확인을 통해 농인들이게 필요한 각종 정보에 대한 접근성을 확보하는 다양한 방법 도출 필요
