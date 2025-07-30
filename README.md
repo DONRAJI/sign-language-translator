@@ -100,9 +100,9 @@
 
 ### 📦 기술 스택
 
-- **Frontend:** React, Vite, Tailwind CSS
+- **Frontend:** React
 - **수어 인식:** Mediapipe Hands, Tensorflow / PyTorch, LSTM (or rule-based)
-- **배포:** Vercel / Netlify
+- **배포:** 
 
 ---
 
