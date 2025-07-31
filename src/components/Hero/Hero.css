@@ -1,0 +1,150 @@
+/* Hero 컴포넌트 전용 스타일 시트 */
+
+.hero-section {
+  background-color: #FFFDE7;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.content-separator {
+  position: absolute;
+  top: 100px;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 2px;
+  background-color: #C6C0C0;
+  z-index: 3;
+}
+
+.hero-logo {
+  position: absolute;
+  top: 30px;
+  left: 23px;
+  display: flex;
+  align-items: center;
+  z-index: 4;
+}
+
+.logo-text-gugi {
+  font-family: 'Gugi', cursive;
+  font-size: 30px;
+  background: linear-gradient(180deg, #FFB9B3 0%, #DCA5D7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+  margin-right: 8px;
+}
+
+.logo-icon-gugi {
+  width: 30px;
+  height: 30px;
+}
+
+.hero-content {
+  width: 100%;
+  max-width: 912px;
+  padding: 0 2rem;
+  box-sizing: border-box;
+  z-index: 2;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.headline-container {
+  width: 100%;
+  margin-bottom: 4rem;
+}
+
+.headline-line {
+  display: flex;
+  align-items: center;
+  line-height: 0.8;
+}
+
+.headline-line-1 {
+  justify-content: flex-start;
+}
+
+.headline-line-2 {
+  justify-content: flex-end;
+}
+
+.headline-icon {
+  width: 146px;
+  height: 160px;
+  margin-right: 1.5rem;
+}
+
+.text-dongle {
+  font-family: 'Dongle', cursive;
+  font-size: 7rem;
+  font-weight: 400;
+  color: #000000;
+}
+
+.gradient-highlight {
+  /* 그라데이션 배경 설정 */
+  background: linear-gradient(180deg, #FFB9B3 0%, #DCA5D7 100%);
+  
+  /* 배경을 글자 모양으로 잘라냄 */
+  -webkit-background-clip: text;
+  background-clip: text;
+  
+  /* 글자색을 투명하게 만들어 뒤의 배경(그라데이션)이 보이게 함 */
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+
+  /* 'Gugi' 폰트와 크기는 그대로 유지 */
+  font-family: 'Gugi', cursive;
+  font-size: 4rem;
+}
+
+.button-group {
+  margin-top: 2rem;
+  display: flex;
+  gap: 1rem;
+}
+
+.button-group .btn-primary {
+  background-color: #FFC0CB;
+  color: #333;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 50px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s;
+}
+
+.button-group .btn-primary:hover {
+  transform: translateY(-2px);
+}
+
+.button-group .btn-secondary {
+  background-color: #fff;
+  color: #333;
+  border: 1px solid #ddd;
+  padding: 1rem 2rem;
+  border-radius: 50px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.button-group .btn-secondary:hover {
+  transform: translateY(-2px);
+}
