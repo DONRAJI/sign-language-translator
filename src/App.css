@@ -20,35 +20,44 @@ body::-webkit-scrollbar {
   text-align: center;
 }
 
-input[type="checkbox"] {
-  margin-left: 8px;
-  appearance: none;
-  width: 40px;
-  height: 20px;
-  background-color: #ddd;
-  border-radius: 10px;
-  position: relative;
+.button-group {
+  margin-top: 2rem;
+  display: flex;
+  gap: 2rem;
+}
+
+.button-group .btn-primary {
+  background-color: #FFC0CB;
+  color: #333;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 20px;
+  font-size: 1rem;
+  font-weight: bold;
   cursor: pointer;
-  outline: none;
-  transition: background-color 0.3s;
+  box-shadow: 0px 4px 4px 0px #00000040;
+  transition: transform 0.2s;
+  backdrop-filter: blur(4px);
 }
 
-input[type="checkbox"]::before {
-  content: '';
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background-color: white;
-  top: 2px;
-  left: 2px;
-  transition: transform 0.3s;
+.button-group .btn-primary:hover {
+  transform: translateY(-2px);
 }
 
-input[type="checkbox"]:checked {
-  background-color: #f48fb1;
+.button-group .btn-secondary {
+  background-color: #FFC0CB;
+  color: #333;
+  border: 1px solid #ddd;
+  padding: 1rem 2rem;
+  border-radius: 20px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0px 4px 4px 0px #00000040;
+  transition: transform 0.2s;
+  backdrop-filter: blur(4px);
 }
 
-input[type="checkbox"]:checked::before {
-  transform: translateX(20px);
+.button-group .btn-secondary:hover {
+  transform: translateY(-2px);
 }

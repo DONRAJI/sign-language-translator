@@ -26,7 +26,7 @@ const WaveWrapper = styled.div`
 
 const waveAnimation = keyframes`
   0% { transform: translateX(0); }
-  100% { transform: translateX(-1600px); }
+  100% { transform: translateX(-800px); }
 `;
 
 const WaveSvg = styled.div`
