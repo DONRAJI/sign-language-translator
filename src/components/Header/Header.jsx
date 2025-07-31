@@ -7,7 +7,6 @@ const Header = () => {
   return (
     <header className="app-header">
       <nav className="nav-container">
-        {/* ✅ className을 간단하게 "nav-item"으로 고정합니다. */}
         <NavLink to="/home" className="nav-item">
           <IoHome />
           <span>홈</span>

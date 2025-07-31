@@ -1,5 +1,3 @@
-/* Hero 컴포넌트 전용 스타일 시트 */
-
 .hero-section {
   background-color: #FFFDE7;
   min-height: 100vh;
@@ -94,18 +92,11 @@
 }
 
 .gradient-highlight {
-  /* 그라데이션 배경 설정 */
   background: linear-gradient(180deg, #FFB9B3 0%, #DCA5D7 100%);
-  
-  /* 배경을 글자 모양으로 잘라냄 */
   -webkit-background-clip: text;
   background-clip: text;
-  
-  /* 글자색을 투명하게 만들어 뒤의 배경(그라데이션)이 보이게 함 */
   -webkit-text-fill-color: transparent;
   color: transparent;
-
-  /* 'Gugi' 폰트와 크기는 그대로 유지 */
   font-family: 'Gugi', cursive;
   font-size: 4rem;
 }

@@ -2,12 +2,6 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled, { keyframes } from 'styled-components';
 
-const fontLink = document.createElement('link');
-fontLink.href = 'https://fonts.googleapis.com/css2?family=Gugi&display=swap';
-fontLink.rel = 'stylesheet';
-document.head.appendChild(fontLink);
-
-// 부드러운 사라짐 효과
 const fadeOut = keyframes`
   from { opacity: 1; }
   to { opacity: 0; }
@@ -40,11 +34,10 @@ const Splash = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       setDisappear(true);
-      // 애니메이션 시간 후 페이지 이동
       setTimeout(() => navigate('/home'), 500);
-    }, 2500); // 2.5초 후 사라지기 시작
+    }, 2500);
 
-    return () => clearTimeout(timer); // 컴포넌트 언마운트 시 타이머 제거
+    return () => clearTimeout(timer);
   }, [navigate]);
 
   return (

@@ -12,7 +12,6 @@ const Hero = ({ onScrollToNext }) => {
 
   return (
     <section id="home" className="hero-section">
-      {/* ✅ 문제 해결: 구분선을 Hero 섹션 내부로 이동 */}
       <div className="content-separator"></div>
 
       <div className="hero-logo">
@@ -21,7 +20,6 @@ const Hero = ({ onScrollToNext }) => {
       </div>
 
       <div className="hero-content">
-        {/* ✅ 문제 해결: 새로운 텍스트 정렬 구조 */}
         <div className="headline-container">
           <div className="headline-line headline-line-1">
             <img src="/front_hand.png" alt="손 아이콘" className="headline-icon" />

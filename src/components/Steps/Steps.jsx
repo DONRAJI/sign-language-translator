@@ -55,17 +55,17 @@ const Steps = () => {
         <h2>사용자들의 따뜻한 이야기</h2>
         <div className="testimonial-grid">
           <div className="testimonial-item">
-            <p>“지하철에서 청각장애인 분과 소통할 수 있었어요. 정말 신기하고 감동적인 경험이었습니다.”</p>
+            <p>“지하철에서 청각장애인 분과 소통할 수 있었어요. <br />정말 신기하고 감동적인 경험이었습니다.”</p>
             <div className="author">
               <img src="https://via.placeholder.com/40" alt="이ㅇㅇ님" />
               <span>이ㅇㅇ님 <small>대학생</small></span>
             </div>
           </div>
           <div className="testimonial-item">
-            <p>“병원에서 의료진과 소통하는데 정말 도움이 되었어요. 빠르고 정확한 번역에 감사드립니다.”</p>
+            <p>“병원에서 의료진과 소통하는데 정말 도움이 되었어요.<br />빠르고 정확한 번역에 감사드립니다.”</p>
             <div className="author">
-              <img src="https://via.placeholder.com/40" alt="이ㅇㅇ님" />
-              <span>이ㅇㅇ님 <small>직장인</small></span>
+              <img src="/홍민기.png" width={40} height={40} alt="홍민기님" />
+              <span>홍민기님 <small>직장인</small></span>
             </div>
           </div>
         </div>

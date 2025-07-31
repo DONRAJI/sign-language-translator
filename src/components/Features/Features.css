@@ -3,7 +3,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  justify-content: center; /* 다시 원래대로 중앙 정렬 */
+  justify-content: center; 
   align-items: center;
   padding: 140px 2rem 5rem 2rem;
   box-sizing: border-box;
@@ -29,7 +29,6 @@
 }
 
 
-/* ✅ 첫 번째와 두 번째 콘텐츠 블록을 위한 스타일 */
 .steps-intro-block {
   width: 100%;
   max-width: 1200px;
@@ -39,10 +38,9 @@
 }
 
 
-/* ✅ 제목 아래의 설명 텍스트는 흰색으로 유지 */
 .features-content-block > p, .steps-intro-block > p {
   max-width: 600px;
-  color: rgba(255, 255, 255, 0.9);
+  color: #7B8690;
   margin-bottom: 3rem;
   text-align: center;
 }
@@ -62,6 +60,7 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
   text-align: center;
+  width: 392;
 }
 
 .feature-item .icon {
@@ -84,12 +83,11 @@
 
 .feature-item p {
   color: #000000;
-  font-size: 0.9rem;
+  font-size: 0.75rem;
   line-height: 1.4;
 }
 
 .steps-intro-block {
-  /* ❌ 불필요한 공백을 만들던 margin-top: auto; 속성을 삭제합니다. */
   padding-top: 3rem;
   z-index: 2;
 }
