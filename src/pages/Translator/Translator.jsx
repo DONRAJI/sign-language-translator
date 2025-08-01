@@ -1,13 +1,14 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Webcam from 'react-webcam';
-import { Holistic } from '@mediapipe/holistic';
+import { Holistic, POSE_CONNECTIONS, FACEMESH_TESSELATION, HAND_CONNECTIONS } from '@mediapipe/holistic';
+import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
 import { Camera } from '@mediapipe/camera_utils';
 import { InferenceSession, Tensor } from 'onnxruntime-web';
 import Header from '../../components/Header/Header';
 import { IoClose } from 'react-icons/io5';
 import './Translator.css';
 
-// 클래스 레이블 (생략 없음)
+// 클래스 레이블
 const CLASS_LABELS = [
     '가래떡', '감기', '검사', '결승전', '고깃국', '고민', '고추', '고추가루', '급하다', '꽈배기',
     '꽈베기', '꿀물', '나사렛대학교', '낚시대', '낚시터', '남아', '냄비', '눈', '뉴질랜드', '다과',
@@ -29,19 +30,20 @@ const Translator = () => {
     const [isWebcamOn, setIsWebcamOn] = useState(false);
     const [isModelLoading, setIsModelLoading] = useState(true);
     const [currentWord, setCurrentWord] = useState('');
+    const [lowConfidencePrediction, setLowConfidencePrediction] = useState(null);
     const [translatedSentences, setTranslatedSentences] = useState([]);
     
     const webcamRef = useRef(null);
+    const canvasRef = useRef(null);
     const holisticRef = useRef(null);
     const cameraRef = useRef(null);
     const sessionRef = useRef(null);
     const sentenceBuffer = useRef([]);
     const sequenceBuffer = useRef([]);
-    const lastPredictionTime = useRef(0); // ✅ 쓰로틀링을 위한 시간 기록
-    const lastSuccessfulWord = useRef(null); // ✅ 중복 업데이트 방지를 위한 ref
+    const lastPredictionTime = useRef(0);
+    const lastSuccessfulWord = useRef(null);
 
     const onResults = useCallback((results) => {
-        // 이 함수는 이제 순수하게 랜드마크 데이터를 버퍼에 저장하는 역할만 합니다.
         let combinedLandmarks = [];
         const pose = results.poseLandmarks || []; POSE_INDICES.forEach(i => { const lm = pose[i]; combinedLandmarks.push(lm ? lm.x : 0, lm ? lm.y : 0, lm ? lm.z : 0); });
         const face = results.faceLandmarks || []; FACE_INDICES.forEach(i => { const lm = face[i]; combinedLandmarks.push(lm ? lm.x : 0, lm ? lm.y : 0, lm ? lm.z : 0); });
@@ -52,13 +54,30 @@ const Translator = () => {
         if (sequenceBuffer.current.length > 150) {
             sequenceBuffer.current.shift();
         }
-    }, []);
 
+        const canvasElement = canvasRef.current;
+        if (canvasElement) {
+            const canvasCtx = canvasElement.getContext('2d');
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            
+            if (results.image) {
+                canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+            }
+
+            if (results.poseLandmarks) drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 4 });
+            if (results.faceLandmarks) drawConnectors(canvasCtx, results.faceLandmarks, FACEMESH_TESSELATION, { color: '#C0C0C070', lineWidth: 1 });
+            if (results.leftHandLandmarks) drawConnectors(canvasCtx, results.leftHandLandmarks, HAND_CONNECTIONS, { color: '#CC0000', lineWidth: 5 });
+            if (results.rightHandLandmarks) drawConnectors(canvasCtx, results.rightHandLandmarks, HAND_CONNECTIONS, { color: '#00CC00', lineWidth: 5 });
+
+            canvasCtx.restore();
+        }
+    }, []);
+    
     const predictSign = useCallback(async () => {
         if (!sessionRef.current || sequenceBuffer.current.length < 150) {
             return;
         }
-
         try {
             const inputTensor = new Tensor('float32', Float32Array.from(sequenceBuffer.current.flat()), [1, 150, 1233]);
             const feeds = { 'input': inputTensor };
@@ -67,16 +86,14 @@ const Translator = () => {
             const prediction = Array.from(outputTensor.data);
 
             const maxProb = Math.max(...prediction);
-            // ✅ 신뢰도(정확도)가 90% 이상인지 검사합니다.
-            if (maxProb >= 0.9) {
-                const maxIndex = prediction.indexOf(maxProb);
-                const predictedWord = CLASS_LABELS[maxIndex];
+            const maxIndex = prediction.indexOf(maxProb);
+            const predictedWord = CLASS_LABELS[maxIndex];
 
-                // ✅ 이전에 성공한 단어와 다를 경우에만 UI를 업데이트합니다.
+            if (maxProb >= 0.9) {
+                setLowConfidencePrediction(null);
                 if (predictedWord && predictedWord !== lastSuccessfulWord.current) {
                     lastSuccessfulWord.current = predictedWord;
                     setCurrentWord(predictedWord);
-
                     if (!sentenceBuffer.current.includes(predictedWord)) {
                         sentenceBuffer.current.push(predictedWord);
                     }
@@ -86,13 +103,16 @@ const Translator = () => {
                         sentenceBuffer.current = [];
                     }
                 }
+            } else {
+                // 신뢰도가 90% 미만이면, 현재 단어를 비우고 추측 단어를 설정
+                setCurrentWord('');
+                setLowConfidencePrediction({ word: predictedWord, confidence: maxProb });
             }
         } catch (e) {
             console.error("Prediction Error:", e);
         }
     }, []);
 
-    // 1. 모든 초기화 로직은 이 useEffect에서 최초 1회만 실행
     useEffect(() => {
         const initialize = async () => {
             const holistic = new Holistic({ locateFile: (file) => `/mediapipe/${file}` });
@@ -111,22 +131,24 @@ const Translator = () => {
         };
         initialize();
     }, [onResults]);
-
-    // 2. 카메라 켜고 끄는 로직 및 추론 트리거
+    
     useEffect(() => {
         if (isWebcamOn && !isModelLoading && webcamRef.current?.video) {
             const videoElement = webcamRef.current.video;
+            const canvasElement = canvasRef.current;
+            // 비디오와 캔버스 크기를 맞춥니다.
+            if(canvasElement && videoElement) {
+                canvasElement.width = videoElement.videoWidth;
+                canvasElement.height = videoElement.videoHeight;
+            }
             cameraRef.current = new Camera(videoElement, {
                 onFrame: async () => {
                     const now = performance.now();
-                    const inferenceInterval = 1000; // 1초 간격
-                    
+                    const inferenceInterval = 1000;
                     if (now - lastPredictionTime.current > inferenceInterval) {
                         lastPredictionTime.current = now;
-                        // ✅ 추론 함수를 별도로 호출합니다.
                         await predictSign();
                     }
-                    
                     if (videoElement && holisticRef.current) {
                         await holisticRef.current.send({ image: videoElement });
                     }
@@ -144,7 +166,6 @@ const Translator = () => {
         };
     }, [isWebcamOn, isModelLoading, predictSign]);
 
-    // 배경색 관리
     useEffect(() => {
         document.body.style.background = 'linear-gradient(180deg, #FFBCB7 0%, #DDA9D9 100%)';
         return () => { document.body.style.background = ''; };
@@ -165,11 +186,13 @@ const Translator = () => {
                             </div>
                         </div>
                         <div className="webcam-body">
-                            <Webcam audio={false} ref={webcamRef} screenshotFormat="image/jpeg" className="webcam-video" mirrored={true} hidden={!isWebcamOn} />
+                            <Webcam audio={false} ref={webcamRef} className="webcam-video hidden-webcam" />
+                            <canvas ref={canvasRef} className="webcam-canvas"></canvas>
                             {isModelLoading && <div className="loading-overlay">AI 모델을 불러오는 중...</div>}
                             {!isWebcamOn && (<div className="webcam-placeholder" onClick={() => setIsWebcamOn(true)}>카메라 버튼을 눌러주세요</div>)}
                         </div>
                     </div>
+
                     <div className="grid-item translated-card">
                         <h3>번역된 문단</h3>
                         <div className="translated-list">
@@ -181,13 +204,26 @@ const Translator = () => {
                             ))}
                         </div>
                     </div>
+                    
                     <div className="grid-item recognized-card">
                         <h3>현재 인식된 단어</h3>
                         <div className="recognized-content">
-                            <h2>{isWebcamOn ? (currentWord || '...') : ''}</h2>
-                            <p>{isWebcamOn ? (currentWord ? '단어가 인식되었습니다' : '인식 대기 중...') : ''}</p>
+                            {currentWord ? (
+                                <>
+                                    <h2 className="success-word">{currentWord}</h2>
+                                    <p>단어가 인식되었습니다</p>
+                                </>
+                            ) : lowConfidencePrediction ? (
+                                <>
+                                    <h2 className="guess-word">{`"${lowConfidencePrediction.word}"`}</h2>
+                                    <p>{`혹시 이 단어인가요? (정확도: ${Math.round(lowConfidencePrediction.confidence * 100)}%)`}</p>
+                                </>
+                            ) : (
+                                <h2>{isWebcamOn ? '...' : '인식 대기 중'}</h2>
+                            )}
                         </div>
                     </div>
+
                     <div className="grid-item tips-card">
                         <h3>사용 팁</h3>
                         <ul>
