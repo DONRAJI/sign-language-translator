@@ -2,29 +2,14 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Webcam from 'react-webcam';
 import { Holistic, POSE_CONNECTIONS, FACEMESH_TESSELATION, HAND_CONNECTIONS } from '@mediapipe/holistic';
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
-import { Camera } from '@mediapipe/camera_utils';
 import { InferenceSession, Tensor } from 'onnxruntime-web';
 import Header from '../../components/Header/Header';
 import { IoClose } from 'react-icons/io5';
 import './Translator.css';
 
-// 클래스 레이블
-const CLASS_LABELS = [
-    '가래떡', '감기', '검사', '결승전', '고깃국', '고민', '고추', '고추가루', '급하다', '꽈배기',
-    '꽈베기', '꿀물', '나사렛대학교', '낚시대', '낚시터', '남아', '냄비', '눈', '뉴질랜드', '다과',
-    '당뇨병', '독서', '독신', '돼지고기', '된장찌개', '된장찌게', '두부', '딸기', '떡국', '라면',
-    '막걸리', '매표소', '면역', '무', '발가락', '밥그릇', '밥솥', '방충', '배드민턴', '배추국',
-    '배춧국', '벌꿀', '변비', '병명', '병문안', '보건소', '보신탕', '부엌', '불면증', '불행',
-    '붕대', '비빔밥', '빈혈', '뻔뻔', '사골', '사과', '사위', '사이다', '설사', '성병',
-    '성실', '소불고기', '소화제', '손녀', '손자', '수면제', '수어', '수집가', '슬프다', '신사',
-    '싫어하다', '안타깝다', '알아서', '어색하다', '여아', '여행지', '열아홉번째', '영아', '예식장', '올림픽경기',
-    '외국인', '운동경기', '음료수', '입원', '자극', '장애인', '재혼', '지방경찰청장', '진단서', '찬물',
-    '첫번째', '축구장', '치료', '치료법', '친아들', '침착', '퇴원', '필기시험', '학교연혁', '한약',
-    '한약방', '화상', '회복'
-];
-const POSE_INDICES = Array.from(Array(25).keys());
-const FACE_INDICES = Array.from(Array(70).keys());
-const HAND_INDICES = Array.from(Array(21).keys());
+// 클래스 레이블 (ONNX 모델과 순서가 일치해야 함)
+const CLASS_LABELS = ['감기', '고민', '라면', '수어', '슬프다']; 
+const SEQUENCE_LENGTH = 150; // 모델이 학습된 시퀀스 길이 (예: 30 프레임)
 
 const Translator = () => {
     const [isWebcamOn, setIsWebcamOn] = useState(false);
@@ -36,136 +21,152 @@ const Translator = () => {
     const webcamRef = useRef(null);
     const canvasRef = useRef(null);
     const holisticRef = useRef(null);
-    const cameraRef = useRef(null);
     const sessionRef = useRef(null);
     const sentenceBuffer = useRef([]);
     const sequenceBuffer = useRef([]);
-    const lastPredictionTime = useRef(0);
     const lastSuccessfulWord = useRef(null);
+    const animationFrameId = useRef(null);
+    const lastPredictionTime = useRef(0); // 추론 간격 조절용
 
-    const onResults = useCallback((results) => {
-        let combinedLandmarks = [];
-        const pose = results.poseLandmarks || []; POSE_INDICES.forEach(i => { const lm = pose[i]; combinedLandmarks.push(lm ? lm.x : 0, lm ? lm.y : 0, lm ? lm.z : 0); });
-        const face = results.faceLandmarks || []; FACE_INDICES.forEach(i => { const lm = face[i]; combinedLandmarks.push(lm ? lm.x : 0, lm ? lm.y : 0, lm ? lm.z : 0); });
-        const leftHand = results.leftHandLandmarks || []; HAND_INDICES.forEach(i => { const lm = leftHand[i]; combinedLandmarks.push(lm ? lm.x : 0, lm ? lm.y : 0, lm ? lm.z : 0); });
-        const rightHand = results.rightHandLandmarks || []; HAND_INDICES.forEach(i => { const lm = rightHand[i]; combinedLandmarks.push(lm ? lm.x : 0, lm ? lm.y : 0, lm ? lm.z : 0); });
+    // 랜드마크 데이터를 1차원 배열로 변환하는 함수
+    const extractKeypoints = (results) => {
+        const pose = results.poseLandmarks ? results.poseLandmarks.map(lm => [lm.x, lm.y, lm.z, lm.visibility]).flat() : new Array(33 * 4).fill(0);
+        const face = results.faceLandmarks ? results.faceLandmarks.map(lm => [lm.x, lm.y, lm.z]).flat() : new Array(468 * 3).fill(0);
+        const lh = results.leftHandLandmarks ? results.leftHandLandmarks.map(lm => [lm.x, lm.y, lm.z]).flat() : new Array(21 * 3).fill(0);
+        const rh = results.rightHandLandmarks ? results.rightHandLandmarks.map(lm => [lm.x, lm.y, lm.z]).flat() : new Array(21 * 3).fill(0);
+        return [...pose, ...face, ...lh, ...rh];
+    };
+
+    // MediaPipe Holistic 결과 콜백 함수
+    const onResults = useCallback(async (results) => {
+        const canvasElement = canvasRef.current;
+        if (!canvasElement) return;
+
+        const canvasCtx = canvasElement.getContext('2d');
+        canvasCtx.save();
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+        // --- 화면 좌우 반전 로직 ---
+        canvasCtx.scale(-1, 1);
+        canvasCtx.translate(-canvasElement.width, 0);
+
+        // 비디오 프레임을 캔버스에 그림 (미러링된 효과)
+        canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
         
-        sequenceBuffer.current.push(combinedLandmarks);
-        if (sequenceBuffer.current.length > 150) {
+        // 랜드마크 그리기
+        drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 4 });
+        drawLandmarks(canvasCtx, results.poseLandmarks, { color: '#FF0000', lineWidth: 2 });
+        drawConnectors(canvasCtx, results.faceLandmarks, FACEMESH_TESSELATION, { color: '#C0C0C070', lineWidth: 1 });
+        drawConnectors(canvasCtx, results.leftHandLandmarks, HAND_CONNECTIONS, { color: '#CC0000', lineWidth: 5 });
+        drawConnectors(canvasCtx, results.rightHandLandmarks, HAND_CONNECTIONS, { color: '#00CC00', lineWidth: 5 });
+
+        canvasCtx.restore();
+
+        // --- ONNX 추론 로직 ---
+        const keypoints = extractKeypoints(results);
+        sequenceBuffer.current.push(keypoints);
+        if (sequenceBuffer.current.length > SEQUENCE_LENGTH) {
             sequenceBuffer.current.shift();
         }
 
-        const canvasElement = canvasRef.current;
-        if (canvasElement) {
-            const canvasCtx = canvasElement.getContext('2d');
-            canvasCtx.save();
-            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        const now = performance.now();
+        if (sequenceBuffer.current.length === SEQUENCE_LENGTH && now - lastPredictionTime.current > 500) { // 0.5초마다 추론
+            lastPredictionTime.current = now;
             
-            if (results.image) {
-                canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
-            }
+            const flatData = sequenceBuffer.current.flat();
+            const inputTensor = new Tensor('float32', Float32Array.from(flatData), [1, SEQUENCE_LENGTH, 1662]);
+            
+            try {
+                const feeds = { 'input': inputTensor }; // ONNX 모델의 입력 이름
+                const outputMap = await sessionRef.current.run(feeds);
+                const outputTensor = outputMap.output; // ONNX 모델의 출력 이름
+                const prediction = Array.from(outputTensor.data);
 
-            if (results.poseLandmarks) drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 4 });
-            if (results.faceLandmarks) drawConnectors(canvasCtx, results.faceLandmarks, FACEMESH_TESSELATION, { color: '#C0C0C070', lineWidth: 1 });
-            if (results.leftHandLandmarks) drawConnectors(canvasCtx, results.leftHandLandmarks, HAND_CONNECTIONS, { color: '#CC0000', lineWidth: 5 });
-            if (results.rightHandLandmarks) drawConnectors(canvasCtx, results.rightHandLandmarks, HAND_CONNECTIONS, { color: '#00CC00', lineWidth: 5 });
+                const maxProb = Math.max(...prediction);
+                const maxIndex = prediction.indexOf(maxProb);
+                const predictedWord = CLASS_LABELS[maxIndex];
 
-            canvasCtx.restore();
-        }
-    }, []);
-    
-    const predictSign = useCallback(async () => {
-        if (!sessionRef.current || sequenceBuffer.current.length < 150) {
-            return;
-        }
-        try {
-            const inputTensor = new Tensor('float32', Float32Array.from(sequenceBuffer.current.flat()), [1, 150, 1233]);
-            const feeds = { 'input': inputTensor };
-            const results = await sessionRef.current.run(feeds);
-            const outputTensor = results.output;
-            const prediction = Array.from(outputTensor.data);
+                if (maxProb >= 0.8) { // 신뢰도 임계값 조정
+                    setLowConfidencePrediction(null);
+                    if (predictedWord && predictedWord !== lastSuccessfulWord.current) {
+                        lastSuccessfulWord.current = predictedWord;
+                        setCurrentWord(predictedWord);
+                        
+                        // 문장 버퍼에 추가 (중복 방지)
+                        if (sentenceBuffer.current[sentenceBuffer.current.length - 1] !== predictedWord) {
+                            sentenceBuffer.current.push(predictedWord);
+                        }
 
-            const maxProb = Math.max(...prediction);
-            const maxIndex = prediction.indexOf(maxProb);
-            const predictedWord = CLASS_LABELS[maxIndex];
-
-            if (maxProb >= 0.9) {
-                setLowConfidencePrediction(null);
-                if (predictedWord && predictedWord !== lastSuccessfulWord.current) {
-                    lastSuccessfulWord.current = predictedWord;
-                    setCurrentWord(predictedWord);
-                    if (!sentenceBuffer.current.includes(predictedWord)) {
-                        sentenceBuffer.current.push(predictedWord);
+                        if (sentenceBuffer.current.length >= 3) {
+                            const newSentence = { id: Date.now(), text: sentenceBuffer.current.join(' ') };
+                            setTranslatedSentences(prev => [newSentence, ...prev.slice(0, 9)]);
+                            sentenceBuffer.current = [];
+                        }
                     }
-                    if (sentenceBuffer.current.length >= 3) {
-                        const newSentence = { id: Date.now(), text: sentenceBuffer.current.join(' ') };
-                        setTranslatedSentences(prev => [{...newSentence, title: `문단 ${prev.length + 1}`}, ...prev.slice(0, 9)]);
-                        sentenceBuffer.current = [];
-                    }
+                } else {
+                    setCurrentWord('');
+                    setLowConfidencePrediction({ word: predictedWord, confidence: maxProb });
                 }
-            } else {
-                // 신뢰도가 90% 미만이면, 현재 단어를 비우고 추측 단어를 설정
-                setCurrentWord('');
-                setLowConfidencePrediction({ word: predictedWord, confidence: maxProb });
+            } catch (e) {
+                console.error("ONNX 추론 에러:", e);
             }
-        } catch (e) {
-            console.error("Prediction Error:", e);
         }
     }, []);
 
+    // Holistic & ONNX 모델 초기화
     useEffect(() => {
         const initialize = async () => {
-            const holistic = new Holistic({ locateFile: (file) => `/mediapipe/${file}` });
-            holistic.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-            holistic.onResults(onResults);
-            holisticRef.current = holistic;
+            setIsModelLoading(true);
             try {
-                const modelPath = '/sign_language_model.onnx';
-                const newSession = await InferenceSession.create(modelPath);
-                sessionRef.current = newSession;
-                console.log("ONNX model loaded successfully.");
+                // Holistic 초기화
+                const holistic = new Holistic({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/holistic/${file}` });
+                holistic.setOptions({
+                    modelComplexity: 1,
+                    smoothLandmarks: true,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5,
+                });
+                holistic.onResults(onResults);
+                holisticRef.current = holistic;
+
+                // ONNX 런타임 및 모델 로드
+                const session = await InferenceSession.create('/sign_language_model_5_words.onnx');
+                sessionRef.current = session;
+                console.log("ONNX 모델 로딩 성공.");
+
             } catch (error) {
-                console.error("Failed to load the ONNX model:", error);
+                console.error("초기화 실패:", error);
             }
             setIsModelLoading(false);
         };
         initialize();
     }, [onResults]);
-    
-    useEffect(() => {
-        if (isWebcamOn && !isModelLoading && webcamRef.current?.video) {
-            const videoElement = webcamRef.current.video;
-            const canvasElement = canvasRef.current;
-            // 비디오와 캔버스 크기를 맞춥니다.
-            if(canvasElement && videoElement) {
-                canvasElement.width = videoElement.videoWidth;
-                canvasElement.height = videoElement.videoHeight;
-            }
-            cameraRef.current = new Camera(videoElement, {
-                onFrame: async () => {
-                    const now = performance.now();
-                    const inferenceInterval = 1000;
-                    if (now - lastPredictionTime.current > inferenceInterval) {
-                        lastPredictionTime.current = now;
-                        await predictSign();
-                    }
-                    if (videoElement && holisticRef.current) {
-                        await holisticRef.current.send({ image: videoElement });
-                    }
-                },
-                width: 640,
-                height: 480,
-            });
-            cameraRef.current.start();
-        }
-        return () => {
-            if (cameraRef.current) {
-                cameraRef.current.stop();
-                cameraRef.current = null;
-            }
-        };
-    }, [isWebcamOn, isModelLoading, predictSign]);
 
+    // 웹캠 프레임 처리 루프
+    useEffect(() => {
+        const processWebcam = async () => {
+            if (isWebcamOn && !isModelLoading && webcamRef.current?.video && holisticRef.current) {
+                const video = webcamRef.current.video;
+                
+                // 캔버스 크기를 비디오 크기에 맞춤
+                if (canvasRef.current && (canvasRef.current.width !== video.videoWidth || canvasRef.current.height !== video.videoHeight)) {
+                    canvasRef.current.width = video.videoWidth;
+                    canvasRef.current.height = video.videoHeight;
+                }
+
+                await holisticRef.current.send({ image: video });
+            }
+            animationFrameId.current = requestAnimationFrame(processWebcam);
+        };
+
+        processWebcam();
+
+        return () => {
+            cancelAnimationFrame(animationFrameId.current);
+        };
+    }, [isWebcamOn, isModelLoading]);
+    
+    // 배경색 설정
     useEffect(() => {
         document.body.style.background = 'linear-gradient(180deg, #FFBCB7 0%, #DDA9D9 100%)';
         return () => { document.body.style.background = ''; };
@@ -186,13 +187,23 @@ const Translator = () => {
                             </div>
                         </div>
                         <div className="webcam-body">
-                            <Webcam audio={false} ref={webcamRef} className="webcam-video hidden-webcam" />
+                            {/* 웹캠은 보이지 않게 처리하고 스트림 소스로만 사용 */}
+                            <Webcam
+                                audio={false}
+                                ref={webcamRef}
+                                style={{ display: 'none' }} 
+                                mirrored={true}
+                                hidden={!isWebcamOn}
+                                
+                            />
+                            {/* 모든 시각적 결과는 캔버스에 렌더링 */}
                             <canvas ref={canvasRef} className="webcam-canvas"></canvas>
                             {isModelLoading && <div className="loading-overlay">AI 모델을 불러오는 중...</div>}
-                            {!isWebcamOn && (<div className="webcam-placeholder" onClick={() => setIsWebcamOn(true)}>카메라 버튼을 눌러주세요</div>)}
+                            {!isWebcamOn && !isModelLoading && (<div className="webcam-placeholder" onClick={() => setIsWebcamOn(true)}>카메라 버튼을 눌러주세요</div>)}
                         </div>
                     </div>
 
+                    {/* 나머지 JSX 코드는 동일 */}
                     <div className="grid-item translated-card">
                         <h3>번역된 문단</h3>
                         <div className="translated-list">
