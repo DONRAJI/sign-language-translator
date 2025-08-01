@@ -1,16 +1,14 @@
-/* Features 컴포넌트 전용 스타일 (모바일 우선 반응형 최종 버전) */
-
 /* ============================================= */
 /* 1. 기본 스타일 (Mobile-First: ~768px)        */
 /* ============================================= */
 .features-section {
-  background: linear-gradient(180deg, #FFBCB7 0%, #DDA9D9 100%);
+  background: linear-gradient(180deg, #DDA9D9 0%, #FFBCB7 100%);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  padding: 100px 1rem 3rem 1rem; /* 모바일용 패딩 */
+  padding: 100px 1rem 3rem 1rem;
   box-sizing: border-box;
   position: relative;
   overflow: hidden;
@@ -26,7 +24,7 @@
 .feature-title {
   font-family: 'Pretendard', sans-serif;
   font-weight: 600;
-  font-size: 32px; /* 모바일용 제목 크기 */
+  font-size: 32px;
   color: #000000;
   line-height: 1.2;
   margin-bottom: 1rem;
@@ -35,30 +33,31 @@
 
 .features-content-block > p {
   max-width: 600px;
-  color: rgba(255, 255, 255, 0.9);
+  color: #7B8690;
   margin-bottom: 3rem;
   text-align: center;
 }
 
 .features-grid {
   display: flex;
-  /* ✅ 모바일에서는 세로로 쌓습니다. */
   flex-direction: column; 
-  gap: 1.5rem; /* 카드 사이의 세로 간격 */
-  width: 100%; /* 부모 너비에 꽉 채움 */
-  align-items: center; /* 가운데 정렬 */
+  gap: 1.5rem;
+  width: 100%;
+  align-items: center;
 }
 
 .feature-item {
   background-color: rgba(255, 255, 255, 0.7);
   padding: 2rem;
   border-radius: 20px;
-  width: 100%; /* 화면 너비에 꽉 차도록 설정 */
-  max-width: 350px; /* 너무 넓어지는 것을 방지 */
+  width: 100%;
+  max-width: 350px;
   box-sizing: border-box;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.18);
   text-align: center;
+  display: flex;
+  flex-direction: column;
 }
 
 .feature-item .icon {
@@ -83,6 +82,7 @@
   color: #555;
   font-size: 0.9rem;
   line-height: 1.4;
+  flex-grow: 1; 
 }
 
 /* ======================================================== */
@@ -90,21 +90,23 @@
 /* ======================================================== */
 @media (min-width: 769px) {
   .features-section {
-    padding: 140px 2rem 5rem 2rem; /* 데스크톱용 패딩 */
+    padding: 140px 2rem 5rem 2rem;
   }
   
   .feature-title {
-    font-size: 40px; /* 데스크톱용 제목 크기 */
+    font-size: 40px;
   }
   
-  .features-grid {
-    /* ✅ 데스크톱에서는 다시 가로로 배치합니다. */
+.features-grid {
     flex-direction: row;
-    align-items: stretch; /* 카드들의 높이를 동일하게 만듦 */
+    align-items: stretch;
     gap: 2rem;
+    justify-content: center;
+    width: auto;
   }
   
   .feature-item {
-    width: 280px; /* 데스크톱에서는 고정 너비를 가집니다. */
+    width: 280px;
+    max-width: none;
   }
 }

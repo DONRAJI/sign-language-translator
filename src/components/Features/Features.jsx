@@ -1,4 +1,3 @@
-// src/components/Features/Features.jsx
 import React, { forwardRef } from 'react';
 import './Features.css';
 

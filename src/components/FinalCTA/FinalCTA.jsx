@@ -2,7 +2,6 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import './FinalCTA.css';
 
-// '처음으로' 버튼 클릭 시 실행할 함수를 props로 받습니다.
 const FinalCTA = ({ onNavigateToTop }) => {
   const navigate = useNavigate();
 
