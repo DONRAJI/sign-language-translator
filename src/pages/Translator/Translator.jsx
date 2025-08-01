@@ -1,5 +1,3 @@
-// npm install @mediapipe/holistic @mediapipe/camera_utils onnxruntime-web react-webcam react-icons copyfiles --save-dev
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Webcam from 'react-webcam';
 import { Holistic } from '@mediapipe/holistic';
@@ -9,7 +7,7 @@ import Header from '../../components/Header/Header';
 import { IoClose } from 'react-icons/io5';
 import './Translator.css';
 
-// 클래스 레이블 (103개 기준)
+// 클래스 레이블 (생략 없음)
 const CLASS_LABELS = [
     '가래떡', '감기', '검사', '결승전', '고깃국', '고민', '고추', '고추가루', '급하다', '꽈배기',
     '꽈베기', '꿀물', '나사렛대학교', '낚시대', '낚시터', '남아', '냄비', '눈', '뉴질랜드', '다과',
@@ -23,7 +21,6 @@ const CLASS_LABELS = [
     '첫번째', '축구장', '치료', '치료법', '친아들', '침착', '퇴원', '필기시험', '학교연혁', '한약',
     '한약방', '화상', '회복'
 ];
-
 const POSE_INDICES = Array.from(Array(25).keys());
 const FACE_INDICES = Array.from(Array(70).keys());
 const HAND_INDICES = Array.from(Array(21).keys());
@@ -33,8 +30,9 @@ const Translator = () => {
     const [isModelLoading, setIsModelLoading] = useState(true);
     const [currentWord, setCurrentWord] = useState('');
     const [translatedSentences, setTranslatedSentences] = useState([]);
-    const [session, setSession] = useState(null);
-
+    
+    // ✅ session을 state가 아닌 ref로 관리합니다.
+    const sessionRef = useRef(null);
     const webcamRef = useRef(null);
     const holisticRef = useRef(null);
     const cameraRef = useRef(null);
@@ -42,113 +40,81 @@ const Translator = () => {
     const sequenceBuffer = useRef([]);
     const lastPredictedWord = useRef(null);
 
-    const normalizeSkeleton = useCallback((landmarks) => {
-        if (!landmarks || landmarks.length !== 411) return null;
-        const keypoints2d = [];
-        for (let i = 0; i < landmarks.length; i += 3) {
-            keypoints2d.push([landmarks[i], landmarks[i + 1], landmarks[i + 2]]);
-        }
-        const neckPoint = keypoints2d[1];
-        if (neckPoint[0] === 0 && neckPoint[1] === 0) return new Array(landmarks.length).fill(0);
-        let relativeKeypoints = keypoints2d.map(p => [p[0] - neckPoint[0], p[1] - neckPoint[1]]);
-        const leftShoulder = keypoints2d[5];
-        const rightShoulder = keypoints2d[2];
-        if (leftShoulder.every(p => p !== 0) && rightShoulder.every(p => p !== 0)) {
-            const shoulderDist = Math.sqrt(Math.pow(leftShoulder[0] - rightShoulder[0], 2) + Math.pow(leftShoulder[1] - rightShoulder[1], 2));
-            if (shoulderDist > 1e-4) {
-                relativeKeypoints = relativeKeypoints.map(p => [p[0] / shoulderDist, p[1] / shoulderDist]);
-            }
-        }
-        const normalizedFrame = relativeKeypoints.map((p, i) => [...p, keypoints2d[i][2]]);
-        return normalizedFrame.flat();
-    }, []);
-
-    const predictSign = useCallback(async (landmarks) => {
-        if (!session || !landmarks) return;
-        const normalizedLandmarks = normalizeSkeleton(landmarks);
-        if (!normalizedLandmarks) return;
-        sequenceBuffer.current.push(normalizedLandmarks);
-        if (sequenceBuffer.current.length > 150) {
-            sequenceBuffer.current.shift();
-        } else if (sequenceBuffer.current.length < 150) {
-            return;
-        }
-        try {
-            const inputTensor = new Tensor('float32', Float32Array.from(sequenceBuffer.current.flat()), [1, 150, 411]);
-            const feeds = { 'input': inputTensor };
-            const results = await session.run(feeds);
-            const outputTensor = results.output;
-            const prediction = Array.from(outputTensor.data);
-            const maxProb = Math.max(...prediction);
-            const maxIndex = prediction.indexOf(maxProb);
-            return CLASS_LABELS[maxIndex];
-        } catch (error) {
-            console.error("Model prediction failed:", error);
-        }
-    }, [session, normalizeSkeleton]);
-
     const onResults = useCallback(async (results) => {
         let combinedLandmarks = [];
-        const pose = results.poseLandmarks || [];
-        POSE_INDICES.forEach(i => { const lm = pose[i]; combinedLandmarks.push(lm ? lm.x : 0, lm ? lm.y : 0, lm ? lm.z : 0); });
-        const face = results.faceLandmarks || [];
-        FACE_INDICES.forEach(i => { const lm = face[i]; combinedLandmarks.push(lm ? lm.x : 0, lm ? lm.y : 0, lm ? lm.z : 0); });
-        const leftHand = results.leftHandLandmarks || [];
-        HAND_INDICES.forEach(i => { const lm = leftHand[i]; combinedLandmarks.push(lm ? lm.x : 0, lm ? lm.y : 0, lm ? lm.z : 0); });
-        const rightHand = results.rightHandLandmarks || [];
-        HAND_INDICES.forEach(i => { const lm = rightHand[i]; combinedLandmarks.push(lm ? lm.x : 0, lm ? lm.y : 0, lm ? lm.z : 0); });
+        const pose = results.poseLandmarks || []; POSE_INDICES.forEach(i => { const lm = pose[i]; combinedLandmarks.push(lm ? lm.x : 0, lm ? lm.y : 0, lm ? lm.z : 0); });
+        const face = results.faceLandmarks || []; FACE_INDICES.forEach(i => { const lm = face[i]; combinedLandmarks.push(lm ? lm.x : 0, lm ? lm.y : 0, lm ? lm.z : 0); });
+        const leftHand = results.leftHandLandmarks || []; HAND_INDICES.forEach(i => { const lm = leftHand[i]; combinedLandmarks.push(lm ? lm.x : 0, lm ? lm.y : 0, lm ? lm.z : 0); });
+        const rightHand = results.rightHandLandmarks || []; HAND_INDICES.forEach(i => { const lm = rightHand[i]; combinedLandmarks.push(lm ? lm.x : 0, lm ? lm.y : 0, lm ? lm.z : 0); });
 
-        if (combinedLandmarks.length === 411) {
-            const predictedWord = await predictSign(combinedLandmarks);
-            if (predictedWord && predictedWord !== lastPredictedWord.current) {
-                lastPredictedWord.current = predictedWord;
-                setCurrentWord(predictedWord);
-                if (!sentenceBuffer.current.includes(predictedWord)) {
-                    sentenceBuffer.current.push(predictedWord);
-                }
-                if (sentenceBuffer.current.length >= 3) {
-                    setTranslatedSentences(prev => {
-                        const newSentence = { id: Date.now(), title: `문단 ${prev.length + 1}`, text: sentenceBuffer.current.join(' ') };
+        // 입력 데이터 준비 로직 (이 부분은 모델에 맞게 수정될 수 있습니다.)
+        sequenceBuffer.current.push(combinedLandmarks);
+        if (sequenceBuffer.current.length > 150) sequenceBuffer.current.shift();
+        if (sequenceBuffer.current.length < 150) return;
+
+        try {
+            // ✅ ref로 session에 접근
+            if (sessionRef.current) {
+                const flatSequence = sequenceBuffer.current.flat();
+                // 텐서 shape를 AI 모델의 입력 shape와 반드시 일치시켜야 합니다.
+                // 150 * 1233 (411*3)
+                const inputTensor = new Tensor('float32', Float32Array.from(flatSequence), [1, 150, 1233]);
+                const feeds = { 'input': inputTensor };
+                const results = await sessionRef.current.run(feeds);
+                const outputTensor = results.output;
+                const prediction = Array.from(outputTensor.data);
+                const maxIndex = prediction.indexOf(Math.max(...prediction));
+                const predictedWord = CLASS_LABELS[maxIndex];
+
+                if (predictedWord && predictedWord !== lastPredictedWord.current) {
+                    lastPredictedWord.current = predictedWord;
+                    setCurrentWord(predictedWord);
+                    if (!sentenceBuffer.current.includes(predictedWord)) {
+                        sentenceBuffer.current.push(predictedWord);
+                    }
+                    if (sentenceBuffer.current.length >= 3) {
+                        const newSentence = { id: Date.now(), text: sentenceBuffer.current.join(' ') };
+                        setTranslatedSentences(prev => [{...newSentence, title: `문단 ${prev.length + 1}`}, ...prev.slice(0, 9)]);
                         sentenceBuffer.current = [];
-                        return [newSentence, ...prev.slice(0, 9)];
-                    });
+                    }
                 }
             }
-        }
-    }, [predictSign]);
+        } catch(e) { console.error("Prediction Error: ", e); }
+    }, []); // ✅ 의존성 배열을 비워 이 함수가 절대 재생성되지 않도록 합니다.
 
+    // ✅ 1. 모든 초기화 로직은 이 useEffect에서 최초 1회만 실행됩니다.
     useEffect(() => {
-        holisticRef.current = new Holistic({
-            locateFile: (file) => `/mediapipe/${file}`,
-        });
-        holisticRef.current.setOptions({
-            modelComplexity: 1,
-            smoothLandmarks: true,
-            minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5,
-        });
-        holisticRef.current.onResults(onResults);
-
-        const loadModel = async () => {
+        const initialize = async () => {
+            console.log("Initializing models...");
+            const holistic = new Holistic({
+                locateFile: (file) => `/mediapipe/${file}`,
+            });
+            holistic.setOptions({
+                modelComplexity: 1, smoothLandmarks: true,
+                minDetectionConfidence: 0.5, minTrackingConfidence: 0.5,
+            });
+            holistic.onResults(onResults);
+            holisticRef.current = holistic;
             try {
                 const modelPath = '/sign_language_model.onnx';
                 const newSession = await InferenceSession.create(modelPath);
-                setSession(newSession);
+                sessionRef.current = newSession; // ✅ 로드된 세션을 ref에 저장
                 console.log("ONNX model loaded successfully.");
             } catch (error) {
                 console.error("Failed to load the ONNX model:", error);
             }
             setIsModelLoading(false);
         };
-        loadModel();
+        initialize();
     }, [onResults]);
 
+    // ✅ 2. 카메라 켜고 끄는 로직은 별도의 useEffect에서 관리합니다.
     useEffect(() => {
-        if (isWebcamOn && !isModelLoading && session && webcamRef.current?.video) {
+        if (isWebcamOn && !isModelLoading && webcamRef.current?.video) {
             const videoElement = webcamRef.current.video;
             cameraRef.current = new Camera(videoElement, {
                 onFrame: async () => {
-                    if (videoElement) {
+                    if (videoElement && holisticRef.current) {
                         await holisticRef.current.send({ image: videoElement });
                     }
                 },
@@ -160,10 +126,12 @@ const Translator = () => {
         return () => {
             if (cameraRef.current) {
                 cameraRef.current.stop();
+                cameraRef.current = null;
             }
         };
-    }, [isWebcamOn, isModelLoading, session]);
+    }, [isWebcamOn, isModelLoading]);
 
+    // 배경색 관리
     useEffect(() => {
         document.body.style.background = 'linear-gradient(180deg, #FFBCB7 0%, #DDA9D9 100%)';
         return () => { document.body.style.background = ''; };
@@ -200,7 +168,6 @@ const Translator = () => {
                             )}
                         </div>
                     </div>
-
                     <div className="grid-item translated-card">
                         <h3>번역된 문단</h3>
                         <div className="translated-list">
@@ -212,7 +179,6 @@ const Translator = () => {
                             ))}
                         </div>
                     </div>
-
                     <div className="grid-item recognized-card">
                         <h3>현재 인식된 단어</h3>
                         <div className="recognized-content">
@@ -220,7 +186,6 @@ const Translator = () => {
                             <p>{isWebcamOn ? (currentWord ? '단어가 인식되었습니다' : '인식 대기 중...') : ''}</p>
                         </div>
                     </div>
-
                     <div className="grid-item tips-card">
                         <h3>사용 팁</h3>
                         <ul>
