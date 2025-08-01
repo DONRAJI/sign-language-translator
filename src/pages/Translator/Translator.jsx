@@ -31,44 +31,52 @@ const Translator = () => {
     const [currentWord, setCurrentWord] = useState('');
     const [translatedSentences, setTranslatedSentences] = useState([]);
     
-    // ✅ session을 state가 아닌 ref로 관리합니다.
-    const sessionRef = useRef(null);
     const webcamRef = useRef(null);
     const holisticRef = useRef(null);
     const cameraRef = useRef(null);
+    const sessionRef = useRef(null);
     const sentenceBuffer = useRef([]);
     const sequenceBuffer = useRef([]);
-    const lastPredictedWord = useRef(null);
+    const lastPredictionTime = useRef(0); // ✅ 쓰로틀링을 위한 시간 기록
+    const lastSuccessfulWord = useRef(null); // ✅ 중복 업데이트 방지를 위한 ref
 
-    const onResults = useCallback(async (results) => {
+    const onResults = useCallback((results) => {
+        // 이 함수는 이제 순수하게 랜드마크 데이터를 버퍼에 저장하는 역할만 합니다.
         let combinedLandmarks = [];
         const pose = results.poseLandmarks || []; POSE_INDICES.forEach(i => { const lm = pose[i]; combinedLandmarks.push(lm ? lm.x : 0, lm ? lm.y : 0, lm ? lm.z : 0); });
         const face = results.faceLandmarks || []; FACE_INDICES.forEach(i => { const lm = face[i]; combinedLandmarks.push(lm ? lm.x : 0, lm ? lm.y : 0, lm ? lm.z : 0); });
         const leftHand = results.leftHandLandmarks || []; HAND_INDICES.forEach(i => { const lm = leftHand[i]; combinedLandmarks.push(lm ? lm.x : 0, lm ? lm.y : 0, lm ? lm.z : 0); });
         const rightHand = results.rightHandLandmarks || []; HAND_INDICES.forEach(i => { const lm = rightHand[i]; combinedLandmarks.push(lm ? lm.x : 0, lm ? lm.y : 0, lm ? lm.z : 0); });
-
-        // 입력 데이터 준비 로직 (이 부분은 모델에 맞게 수정될 수 있습니다.)
+        
         sequenceBuffer.current.push(combinedLandmarks);
-        if (sequenceBuffer.current.length > 150) sequenceBuffer.current.shift();
-        if (sequenceBuffer.current.length < 150) return;
+        if (sequenceBuffer.current.length > 150) {
+            sequenceBuffer.current.shift();
+        }
+    }, []);
+
+    const predictSign = useCallback(async () => {
+        if (!sessionRef.current || sequenceBuffer.current.length < 150) {
+            return;
+        }
 
         try {
-            // ✅ ref로 session에 접근
-            if (sessionRef.current) {
-                const flatSequence = sequenceBuffer.current.flat();
-                // 텐서 shape를 AI 모델의 입력 shape와 반드시 일치시켜야 합니다.
-                // 150 * 1233 (411*3)
-                const inputTensor = new Tensor('float32', Float32Array.from(flatSequence), [1, 150, 1233]);
-                const feeds = { 'input': inputTensor };
-                const results = await sessionRef.current.run(feeds);
-                const outputTensor = results.output;
-                const prediction = Array.from(outputTensor.data);
-                const maxIndex = prediction.indexOf(Math.max(...prediction));
+            const inputTensor = new Tensor('float32', Float32Array.from(sequenceBuffer.current.flat()), [1, 150, 1233]);
+            const feeds = { 'input': inputTensor };
+            const results = await sessionRef.current.run(feeds);
+            const outputTensor = results.output;
+            const prediction = Array.from(outputTensor.data);
+
+            const maxProb = Math.max(...prediction);
+            // ✅ 신뢰도(정확도)가 90% 이상인지 검사합니다.
+            if (maxProb >= 0.9) {
+                const maxIndex = prediction.indexOf(maxProb);
                 const predictedWord = CLASS_LABELS[maxIndex];
 
-                if (predictedWord && predictedWord !== lastPredictedWord.current) {
-                    lastPredictedWord.current = predictedWord;
+                // ✅ 이전에 성공한 단어와 다를 경우에만 UI를 업데이트합니다.
+                if (predictedWord && predictedWord !== lastSuccessfulWord.current) {
+                    lastSuccessfulWord.current = predictedWord;
                     setCurrentWord(predictedWord);
+
                     if (!sentenceBuffer.current.includes(predictedWord)) {
                         sentenceBuffer.current.push(predictedWord);
                     }
@@ -79,26 +87,22 @@ const Translator = () => {
                     }
                 }
             }
-        } catch(e) { console.error("Prediction Error: ", e); }
-    }, []); // ✅ 의존성 배열을 비워 이 함수가 절대 재생성되지 않도록 합니다.
+        } catch (e) {
+            console.error("Prediction Error:", e);
+        }
+    }, []);
 
-    // ✅ 1. 모든 초기화 로직은 이 useEffect에서 최초 1회만 실행됩니다.
+    // 1. 모든 초기화 로직은 이 useEffect에서 최초 1회만 실행
     useEffect(() => {
         const initialize = async () => {
-            console.log("Initializing models...");
-            const holistic = new Holistic({
-                locateFile: (file) => `/mediapipe/${file}`,
-            });
-            holistic.setOptions({
-                modelComplexity: 1, smoothLandmarks: true,
-                minDetectionConfidence: 0.5, minTrackingConfidence: 0.5,
-            });
+            const holistic = new Holistic({ locateFile: (file) => `/mediapipe/${file}` });
+            holistic.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
             holistic.onResults(onResults);
             holisticRef.current = holistic;
             try {
                 const modelPath = '/sign_language_model.onnx';
                 const newSession = await InferenceSession.create(modelPath);
-                sessionRef.current = newSession; // ✅ 로드된 세션을 ref에 저장
+                sessionRef.current = newSession;
                 console.log("ONNX model loaded successfully.");
             } catch (error) {
                 console.error("Failed to load the ONNX model:", error);
@@ -108,12 +112,21 @@ const Translator = () => {
         initialize();
     }, [onResults]);
 
-    // ✅ 2. 카메라 켜고 끄는 로직은 별도의 useEffect에서 관리합니다.
+    // 2. 카메라 켜고 끄는 로직 및 추론 트리거
     useEffect(() => {
         if (isWebcamOn && !isModelLoading && webcamRef.current?.video) {
             const videoElement = webcamRef.current.video;
             cameraRef.current = new Camera(videoElement, {
                 onFrame: async () => {
+                    const now = performance.now();
+                    const inferenceInterval = 1000; // 1초 간격
+                    
+                    if (now - lastPredictionTime.current > inferenceInterval) {
+                        lastPredictionTime.current = now;
+                        // ✅ 추론 함수를 별도로 호출합니다.
+                        await predictSign();
+                    }
+                    
                     if (videoElement && holisticRef.current) {
                         await holisticRef.current.send({ image: videoElement });
                     }
@@ -129,7 +142,7 @@ const Translator = () => {
                 cameraRef.current = null;
             }
         };
-    }, [isWebcamOn, isModelLoading]);
+    }, [isWebcamOn, isModelLoading, predictSign]);
 
     // 배경색 관리
     useEffect(() => {
@@ -152,20 +165,9 @@ const Translator = () => {
                             </div>
                         </div>
                         <div className="webcam-body">
-                            <Webcam
-                                audio={false}
-                                ref={webcamRef}
-                                screenshotFormat="image/jpeg"
-                                className="webcam-video"
-                                mirrored={true}
-                                hidden={!isWebcamOn}
-                            />
+                            <Webcam audio={false} ref={webcamRef} screenshotFormat="image/jpeg" className="webcam-video" mirrored={true} hidden={!isWebcamOn} />
                             {isModelLoading && <div className="loading-overlay">AI 모델을 불러오는 중...</div>}
-                            {!isWebcamOn && (
-                                <div className="webcam-placeholder" onClick={() => setIsWebcamOn(true)}>
-                                    카메라 버튼을 눌러주세요
-                                </div>
-                            )}
+                            {!isWebcamOn && (<div className="webcam-placeholder" onClick={() => setIsWebcamOn(true)}>카메라 버튼을 눌러주세요</div>)}
                         </div>
                     </div>
                     <div className="grid-item translated-card">
