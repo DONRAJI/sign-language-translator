@@ -1,4 +1,13 @@
-from flask import Flask, render_template, jsonify
+# ====================================================================
+# web_app.py (최종 완성 - Blocking 문제 해결 버전)
+# ====================================================================
+
+# 1. Eventlet 몽키 패치를 가장 먼저 실행
+import eventlet
+eventlet.monkey_patch()
+
+# 2. 필요한 라이브러리 임포트
+from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 import cv2
 import mediapipe as mp
@@ -6,181 +15,152 @@ import numpy as np
 import tensorflow as tf
 import modules.holistic_module as hm
 from modules.utils import Vector_Normalization
-import threading
 import time
 import json
+import traceback
+import base64
+from collections import deque
 
+# Flask 앱과 SocketIO 객체 생성
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
-# 설정
+# --- 전역 변수 및 설정 ---
 actions = ['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ',
            'ㅏ', 'ㅑ', 'ㅓ', 'ㅕ', 'ㅗ', 'ㅛ', 'ㅜ', 'ㅠ', 'ㅡ', 'ㅣ',
            'ㅐ', 'ㅒ', 'ㅔ', 'ㅖ', 'ㅢ', 'ㅚ', 'ㅟ']
 seq_length = 10
-
-# 영문 매핑 정의
-action_eng = {
-    'ㄱ': 'GIYEOK', 'ㄴ': 'NIEUN', 'ㄷ': 'DIGEUT', 'ㄹ': 'RIEUL', 'ㅁ': 'MIEUM',
-    'ㅂ': 'BIEUP', 'ㅅ': 'SIOT', 'ㅇ': 'IEUNG', 'ㅈ': 'JIEUT', 'ㅊ': 'CHIEUT',
-    'ㅋ': 'KIEUK', 'ㅌ': 'TIEUT', 'ㅍ': 'PIEUP', 'ㅎ': 'HIEUT',
-    'ㅏ': 'A', 'ㅑ': 'YA', 'ㅓ': 'EO', 'ㅕ': 'YEO', 'ㅗ': 'O', 'ㅛ': 'YO',
-    'ㅜ': 'U', 'ㅠ': 'YU', 'ㅡ': 'EU', 'ㅣ': 'I',
-    'ㅐ': 'AE', 'ㅒ': 'YAE', 'ㅔ': 'E', 'ㅖ': 'YE', 'ㅢ': 'UI', 'ㅚ': 'OE', 'ㅟ': 'WI'
-}
-
-# 전역 변수
 detector = None
 interpreter = None
-is_running = False
-current_prediction = None
+user_sequences = {} # 사용자별 시퀀스 데이터를 저장할 딕셔너리
+# --- 끝: 전역 변수 및 설정 ---
 
 def initialize_detector_and_model():
     """MediaPipe 홀리스틱 모델과 TFLite 모델 초기화"""
     global detector, interpreter
-    detector = hm.HolisticDetector(min_detection_confidence=0.3)
-    interpreter = tf.lite.Interpreter(model_path="../models/multi_hand_gesture_classifier.tflite")
-    interpreter.allocate_tensors()
-    print("모델 초기화 완료!")
+    import os
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    model_path = os.path.join(current_dir, "..", "models", "multi_hand_gesture_classifier.tflite")
+    
+    if not os.path.exists(model_path):
+        print(f"모델 파일을 찾을 수 없습니다: {model_path}")
+        return False
+    
+    try:
+        detector = hm.HolisticDetector(min_detection_confidence=0.3)
+        interpreter = tf.lite.Interpreter(model_path=model_path)
+        interpreter.allocate_tensors()
+        print("모델 초기화 완료!")
+        return True
+    except Exception as e:
+        print(f"모델 초기화 중 오류 발생: {e}")
+        return False
 
-def process_hand_landmarks(right_hand_lmList):
-    """손 랜드마크 처리 및 벡터 정규화"""
-    joint = np.zeros((42, 2))
-    for j, lm in enumerate(right_hand_lmList.landmark):
-        joint[j] = [lm.x, lm.y]
-    vector, angle_label = Vector_Normalization(joint)
-    return np.concatenate([vector.flatten(), angle_label.flatten()])
+def data_uri_to_cv2_img(uri):
+    """Base64 인코딩된 이미지 문자열을 OpenCV 이미지로 변환"""
+    try:
+        encoded_data = uri.split(',')[1]
+        nparr = np.frombuffer(base64.b64decode(encoded_data), np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        return img
+    except Exception:
+        return None
 
-def predict_action(interpreter, input_data):
-    """TFLite 모델을 사용하여 동작 예측"""
-    input_details = interpreter.get_input_details()
-    output_details = interpreter.get_output_details()
-    interpreter.set_tensor(input_details[0]['index'], input_data)
-    interpreter.invoke()
-    y_pred = interpreter.get_tensor(output_details[0]['index'])
-    return y_pred[0]
-
-def sign_language_detection():
-    """실시간 수어 인식 스레드"""
-    global is_running, current_prediction
+# --- [핵심 해결책 1] 무거운 작업을 처리할 별도의 함수 생성 ---
+def process_image_and_predict(sid, img):
+    """
+    이미지 처리 및 AI 예측의 모든 무거운 작업을 수행합니다.
+    이 함수는 백그라운드 스레드에서 실행됩니다.
+    """
+    global user_sequences, detector, interpreter
     
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print("웹캠을 열 수 없습니다!")
-        return
+    # 사용자별 시퀀스 데이터가 없으면 새로 생성
+    if sid not in user_sequences:
+        user_sequences[sid] = deque(maxlen=seq_length)
     
-    print("웹캠 연결 성공!")
+    seq = user_sequences[sid]
     
-    seq = []
-    frame_count = 0
+    # 이미지 처리 및 예측 로직
+    img_processed = detector.findHolistic(img, draw=False)
+    _, right_hand_lmList = detector.findRighthandLandmark(img_processed)
     
-    while is_running:
-        ret, img = cap.read()
-        if not ret:
-            break
+    if right_hand_lmList is not None:
+        joint = np.zeros((42, 2))
+        if right_hand_lmList.landmark:
+            for j, lm in enumerate(right_hand_lmList.landmark):
+                if j < 42:
+                    joint[j] = [lm.x, lm.y]
         
-        # 이미지 좌우 반전 (거울 효과)
-        img = cv2.flip(img, 1)
+        vector, angle_label = Vector_Normalization(joint)
+        d = np.concatenate([vector.flatten(), angle_label.flatten()])
+        seq.append(d)
         
-        # MediaPipe 홀리스틱 처리
-        img = detector.findHolistic(img, draw=True)
-        _, right_hand_lmList = detector.findRighthandLandmark(img)
-        
-        if right_hand_lmList is not None:
-            # 손 랜드마크 처리
-            d = process_hand_landmarks(right_hand_lmList)
-            seq.append(d)
-            frame_count += 1
+        if len(seq) >= seq_length:
+            input_data = np.expand_dims(np.array(seq, dtype=np.float32), axis=0)
             
-            # 시퀀스 길이 확인
-            if len(seq) >= seq_length:
-                # 입력 데이터 준비
-                input_data = np.expand_dims(np.array(seq[-seq_length:], dtype=np.float32), axis=0)
-                
-                # 예측
-                y_pred = predict_action(interpreter, input_data)
-                i_pred = int(np.argmax(y_pred))
-                conf = y_pred[i_pred]
-                
+            input_details = interpreter.get_input_details()
+            output_details = interpreter.get_output_details()
+            interpreter.set_tensor(input_details[0]['index'], input_data)
+            interpreter.invoke()
+            y_pred = interpreter.get_tensor(output_details[0]['index'])[0]
+            
+            i_pred = int(np.argmax(y_pred))
+            conf = y_pred[i_pred]
+            
+            if conf > 0.95:
                 predicted_action = actions[i_pred]
                 
-                # 상위 3개 예측 결과
-                top_indices = np.argsort(y_pred)[-3:][::-1]
-                top_predictions = []
-                for i, idx in enumerate(top_indices):
-                    top_predictions.append({
-                        'rank': i + 1,
-                        'action': actions[idx],
-                        'action_eng': action_eng.get(actions[idx], actions[idx]),
-                        'confidence': float(y_pred[idx])
-                    })
-                
-                # 현재 예측 결과 업데이트
-                current_prediction = {
+                # 예측 결과를 해당 클라이언트에게만 전송
+                socketio.emit('prediction_result', {
                     'predicted_action': predicted_action,
-                    'predicted_action_eng': action_eng.get(predicted_action, predicted_action),
-                    'confidence': float(conf),
-                    'top_predictions': top_predictions,
-                    'frame_count': frame_count,
-                    'timestamp': time.time()
-                }
+                    'confidence': float(conf)
+                }, room=sid)
                 
-                # WebSocket을 통해 클라이언트에 결과 전송
-                socketio.emit('prediction_result', current_prediction)
-                
-                print(f"예측: {predicted_action} ({action_eng.get(predicted_action, predicted_action)}), 신뢰도: {conf:.3f}")
-        
-        time.sleep(0.1)  # CPU 사용량 조절
-    
-    cap.release()
-    print("수어 인식 스레드 종료")
+                print(f"[{sid}] 예측 성공: {predicted_action} ({conf:.2f}) -> 시퀀스를 초기화합니다.")
+                seq.clear()
 
+# --- Flask 라우트 및 SocketIO 이벤트 핸들러 ---
 @app.route('/')
 def index():
-    """메인 페이지"""
     return render_template('index.html')
 
 @socketio.on('connect')
 def handle_connect():
-    """클라이언트 연결 시"""
-    print('클라이언트가 연결되었습니다.')
-    emit('status', {'message': '연결되었습니다!'})
+    print(f"클라이언트 연결됨: {request.sid}")
+    emit('status', {'message': '서버 연결 성공!'})
 
-@socketio.on('start_detection')
-def handle_start_detection():
-    """수어 인식 시작"""
-    global is_running
-    if not is_running:
-        is_running = True
-        thread = threading.Thread(target=sign_language_detection)
-        thread.daemon = True
-        thread.start()
-        emit('status', {'message': '수어 인식이 시작되었습니다!'})
+@socketio.on('disconnect')
+def handle_disconnect():
+    sid = request.sid
+    if sid in user_sequences:
+        del user_sequences[sid]
+        print(f"클라이언트 연결 끊어짐: {sid}. 해당 사용자의 시퀀스 데이터를 삭제했습니다.")
     else:
-        emit('status', {'message': '이미 실행 중입니다!'})
+        print(f"클라이언트 연결 끊어짐: {sid}.")
 
-@socketio.on('stop_detection')
-def handle_stop_detection():
-    """수어 인식 중지"""
-    global is_running
-    is_running = False
-    emit('status', {'message': '수어 인식이 중지되었습니다!'})
+# [핵심 변경 2] 'process_frame' 핸들러는 이제 매우 가벼워짐
+@socketio.on('process_frame')
+def handle_process_frame(data):
+    """
+    클라이언트로부터 프레임을 받아서, 무거운 작업은 백그라운드에 넘깁니다.
+    이 함수는 즉시 반환되므로 서버가 멈추지 않습니다.
+    """
+    img = data_uri_to_cv2_img(data['image'])
+    if img is not None:
+        # socketio.start_background_task를 사용하여 작업을 위임
+        socketio.start_background_task(
+            target=process_image_and_predict, 
+            sid=request.sid, 
+            img=img
+        )
 
-@socketio.on('get_current_prediction')
-def handle_get_current_prediction():
-    """현재 예측 결과 요청"""
-    if current_prediction:
-        emit('prediction_result', current_prediction)
-    else:
-        emit('status', {'message': '아직 예측 결과가 없습니다.'})
-
+# --- 메인 실행 블록 ---
 if __name__ == '__main__':
-    # 모델 초기화
-    initialize_detector_and_model()
+    if not initialize_detector_and_model():
+        print("모델 초기화에 실패했습니다. 프로그램을 종료합니다.")
+        exit(1)
     
-    print("웹 서버를 시작합니다...")
-    print("브라우저에서 http://localhost:5000 으로 접속하세요.")
+    print("AI 서버가 시작되었습니다. 클라이언트의 연결을 기다립니다...")
     
-    # Flask 앱 실행
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True) 
+    socketio.run(app, host='0.0.0.0', port=5000)
