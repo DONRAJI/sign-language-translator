@@ -151,7 +151,7 @@ const Translator = () => {
           <div className="grid-item recognized-card">
             <h3>현재 인식된 단어</h3>
             <div className="recognized-content">
-              <h2>{isWebcamOn ? (currentWord || '...') : ''}</h2>
+              <span>{isWebcamOn ? (currentWord || '...') : ''}</span>
               <p>{isWebcamOn ? (currentWord ? '단어가 인식되었습니다' : '인식 대기 중...') : ''}</p>
             </div>
           </div>
