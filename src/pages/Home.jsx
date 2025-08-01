@@ -8,6 +8,7 @@ import FinalCTA from '../components/FinalCTA/FinalCTA';
 const Home = () => {
   const heroRef = useRef(null);
   const featuresRef = useRef(null);
+  //dkdk
 
   const scrollToFeatures = () => {
     featuresRef.current?.scrollIntoView({ behavior: 'smooth' });

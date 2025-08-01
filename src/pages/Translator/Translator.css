@@ -1,0 +1,73 @@
+/* Translator 페이지 전용 스타일 (TTS 버튼 최종 버전) */
+
+.translator-container {
+  box-sizing: border-box;
+  padding-top: 80px; /* 헤더 높이만큼 여백 추가 */
+}
+
+.content-wrapper {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem 2rem;
+}
+
+.page-title { font-family: 'Pretendard', sans-serif; font-size: 2rem; font-weight: 700; text-align: left; margin-bottom: 1.5rem; color: #FFFFFF; }
+.grid-container { display: grid; grid-template-columns: 2fr 1.5fr; grid-template-rows: auto auto; gap: 1.5rem; }
+.grid-item { background: #EDF2F7; border-radius: 20px; padding: 1.5rem; box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1); display: flex; flex-direction: column; }
+.grid-item h3 { font-family: 'Pretendard', sans-serif; text-align: left; margin-top: 0; margin-bottom: 1rem; color: #333; font-weight: 600; }
+.webcam-card .card-header { display: flex; justify-content: space-between; align-items: center; }
+.webcam-card .camera-toggle { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+.webcam-body { flex-grow: 1; background-color: #e9ecef; border-radius: 15px; display: flex; justify-content: center; align-items: center; overflow: hidden; position: relative; }
+.webcam-placeholder { cursor: pointer; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; transition: background-color 0.2s; font-family: 'Pretendard', sans-serif; color: #555; }
+.webcam-placeholder:hover { background-color: #dcdfe2; }
+.webcam-video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); } /* width, height 90% 제거 */
+.loading-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); color: white; display: flex; justify-content: center; align-items: center; font-family: 'Pretendard', sans-serif; font-size: 1.2rem; }
+
+.log-card { min-height: 300px; max-height: 500px; }
+.log-list { flex-grow: 1; display: flex; flex-direction: column; gap: 1rem; overflow-y: auto; padding-right: 8px; }
+.log-list::-webkit-scrollbar { width: 8px; }
+.log-list::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); border-radius: 4px; }
+.log-list::-webkit-scrollbar-thumb { background: #bbb; border-radius: 4px; }
+.log-list::-webkit-scrollbar-thumb:hover { background: #999; }
+
+.log-item {
+  background-color: #FFFFFF;
+  border-radius: 10px;
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+.log-item p { margin: 0; font-size: 1.2rem; font-weight: 600; color: #000000; }
+
+/* ✅ TTS 버튼과 닫기 버튼을 감싸는 컨테이너 */
+.log-item-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ✅ TTS 버튼과 닫기 버튼 공통 스타일 */
+.speak-btn, .close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2rem;
+  color: #aaa;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+.speak-btn:hover, .close-btn:hover {
+  color: #555;
+}
+
+.recognized-card { min-height: 200px; justify-content: center; align-items: center; text-align: center; }
+/* ✅ span 태그를 current-word-display 클래스로 변경 */
+.recognized-content .current-word-display { font-family: 'Pretendard', sans-serif; font-weight: 600; font-size: 3rem; margin: 0; line-height: 1; color: #7FC2FF; }
+.recognized-content p { margin: 0; color: #9D948C; font-size: 1.2rem; font-weight: 600; }
+.tips-card ul { padding-left: 1.5rem; margin: 0; text-align: left; color: #555; font-size: 0.9rem; line-height: 1.6; }
+.tips-card li { margin-bottom: 0.75rem; }

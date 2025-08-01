@@ -12,7 +12,6 @@ const Hero = forwardRef(({ onScrollToNext }, ref) => {
 
   return (
     <section id="home" className="hero-section" ref={ref}>
-      <div className="content-separator"></div>
       <div className="hero-logo">
         <span className="logo-text-gugi">손짓</span>
         <img src="/front_hand.png" alt="손 아이콘" className="logo-icon-gugi" />

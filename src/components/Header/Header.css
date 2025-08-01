@@ -7,17 +7,27 @@
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  padding: 22px 2rem;
+  height: auto;
+  backdrop-filter: blur(49.20000076293945px);
+  background: #FFFFFFAD;
   box-sizing: border-box;
 }
-
 .nav-container {
   display: flex;
   align-items: center;
   background-color: #ECEAEA;
-  border-radius: 10px;
-  padding: 6px;
+  border-radius: 1em;
+  padding: 0.1em;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  /* 모바일 화면에서 메뉴 간격을 조절할 수 있습니다 */
+  gap: 1rem; 
+  position: relative;
+}
+
+.main-nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 .nav-item {
@@ -25,17 +35,61 @@
   justify-content: center;
   align-items: center;
   gap: 8px;
-  padding: 0.5rem 1rem;
+  padding: 0.75rem 1.5rem;
   font-family: 'Inter', sans-serif;
   font-size: 20px;
   color: #000000;
   text-decoration: none;
-  border-radius: 9px;
-  transition: background-color 0.2s ease-in-out, font-weight 0.2s;
+  border-radius: 25px;
+  transition: background-color 0.2s ease-in-out, color 0.2s;
 }
 
-/* 마우스를 올렸을 때만 스타일이 적용되도록 :hover 규칙을 사용합니다. */
-.nav-item:hover {
+/* 데스크톱에서는 'active' 상태일 때 캡슐 모양이 됩니다. */
+.nav-item.active {
   background-color: #FFFFFF;
+  color: #333;
   font-weight: 700;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+
+/* ======================================================= */
+/* 2. 미디어 쿼리 (Mobile - 768px 이하 화면에만 적용)   */
+/* ======================================================= */
+@media (max-width: 768px) {
+  
+  /* 모바일에서는 헤더의 좌우 패딩을 줄입니다. */
+  .app-header {
+    padding: 0.5rem 1rem; /* 좌우 패딩을 줄여서 공간을 절약합니다. */
+    background: #FFFDE7;
+    backdrop-filter: blur(49.20000076293945px)
+
+  }
+  
+  /* ✅ 모바일에서는 nav 태그가 회색 컨테이너가 됩니다. */
+  .main-nav {
+    background-color: #ECEAEA;
+    border-radius: 10px;
+    padding: 0.1em;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    gap: 0.5rem; /* 아이템 간격도 살짝 줄입니다. */
+  }
+
+  /* ✅ 모바일에서는 기본적으로 캡슐 모양을 비활성화합니다. */
+  .nav-item {
+    padding: 0.1rem 0.1rem; /* 모바일용 패딩으로 조정 */
+    font-size: 0.5em; /* 모바일용 폰트 크기 */
+  }
+  
+  /* ✅ 모바일에서는 .active 스타일을 초기화하여 캡슐 모양이 보이지 않게 합니다. */
+  .nav-item.active {
+    background-color: transparent; /* 배경색 없음 */
+    box-shadow: none; /* 그림자 없음 */
+    font-weight: 700; /* 굵은 글씨는 유지하여 활성 상태 표시 */
+  }
+  
+  /* ✅ 모바일에서는 대신 :hover 효과를 사용합니다. */
+  .nav-item:hover {
+    background-color: #FFFFFF;
+  }
 }

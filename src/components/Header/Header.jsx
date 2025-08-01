@@ -15,9 +15,9 @@ const Header = () => {
           <IoVideocamOutline />
           <span>수어통역</span>
         </NavLink>
-        <NavLink to="#" className="nav-item">
+        <NavLink to="/education" className="nav-item">
           <IoSettingsOutline />
-          <span>설정</span>
+          <span>수어학습</span>
         </NavLink>
       </nav>
     </header>
